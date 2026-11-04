@@ -4,6 +4,7 @@ import ast
 import operator
 
 
+# These are the only operations allowed in an equation expression.
 _BINARY_OPERATORS = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
@@ -11,17 +12,16 @@ _BINARY_OPERATORS = {
     ast.Div: operator.truediv,
     ast.Pow: operator.pow,
 }
-_UNARY_OPERATORS = {
-    ast.UAdd: operator.pos,
-    ast.USub: operator.neg,
-}
+_UNARY_OPERATORS = {ast.UAdd: operator.pos, ast.USub: operator.neg}
 
 
 def evaluate_expression(expression, x_value):
-    """Evaluate arithmetic with x, allowing only basic arithmetic syntax."""
-    tree = ast.parse(expression, mode="eval")
+    """Evaluate an arithmetic expression containing x."""
+    tree = ast.parse(expression, mode="eval").body
 
     def evaluate(node):
+        """Evaluate one expression-tree node if its syntax is supported."""
+        # Match each supported node type so other Python syntax is rejected.
         if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
             return node.value
         if isinstance(node, ast.Name) and node.id == "x":
@@ -34,11 +34,12 @@ def evaluate_expression(expression, x_value):
             return _UNARY_OPERATORS[type(node.op)](evaluate(node.operand))
         raise ValueError("Use x, numbers, parentheses, and +, -, *, /, or ** only.")
 
-    return evaluate(tree.body)
+    return evaluate(tree)
 
 
 def basic_calculate(first_number, second_number, operation):
-    """Perform one basic arithmetic operation and return its result."""
+    """Perform one basic arithmetic operation."""
+    # Choose the requested operation and guard division against a zero divisor.
     if operation == "+":
         return first_number + second_number
     if operation == "-":
@@ -49,23 +50,23 @@ def basic_calculate(first_number, second_number, operation):
         if second_number == 0:
             raise ZeroDivisionError("Cannot divide by zero.")
         return first_number / second_number
-    raise ValueError("Choose one of: +, -, *, /. ")
+    raise ValueError("Choose +, -, *, or /.")
 
 
-def search_for_x(expression, target, start=-100, end=100, step=0.1, show_steps=False):
-    """Try values in a range and return the one closest to the target."""
-    number_of_steps = round((end - start) / step)
+def solve_for_x(expression, target, start=-100, end=100, show_steps=False):
+    """Search in steps of 0.1 and return the x closest to the target."""
     best_x = start
     best_difference = float("inf")
+    number_of_steps = round((end - start) / 0.1)
 
     for index in range(number_of_steps + 1):
-        x_value = start + index * step
+        x_value = start + index * 0.1
         result = evaluate_expression(expression, x_value)
         difference = abs(result - target)
 
+        # Print this guess when requested, then keep it if it is the closest so far.
         if show_steps:
-            print(f"x = {x_value:.1f} -> result = {result:.2f}, difference = {difference:.2f}")
-
+            print(f"x = {x_value:.1f}: result = {result:.2f}, difference = {difference:.2f}")
         if difference < best_difference:
             best_x = x_value
             best_difference = difference
@@ -73,70 +74,56 @@ def search_for_x(expression, target, start=-100, end=100, step=0.1, show_steps=F
     return best_x, best_difference
 
 
-def solve_for_x(expression, target):
-    """Search from -100 to 100 in steps of 0.1 for the closest x."""
-    return search_for_x(expression, target)
-
-
 def equation_solver_menu():
-    """Ask for an expression and target, then report the closest x found."""
+    """Ask for an expression and target, then print the closest x."""
     expression = input("Enter an expression containing x (for example, x + 5): ")
     target = float(input("What should the expression equal? "))
-
     x_value, difference = solve_for_x(expression, target)
-    print(f"Closest x: {x_value:.1f} (difference from target: {difference:.2f})")
+    print(f"Closest x: {x_value:.1f} (difference: {difference:.2f})")
 
 
 def visualize_search():
-    """Show the search steps for the example x + 5 = 12."""
+    """Show the search steps for x + 5 = 12."""
     expression = "x + 5"
     target = 12
-    # Use a smaller range so the demonstration does not flood the terminal.
-    start = -10
-    end = 10
-
-    print(f"Searching for x in: {expression} = {target}")
-    x_value, difference = search_for_x(
-        expression, target, start=start, end=end, step=0.1, show_steps=True
-    )
-    print(f"Closest x: {x_value:.1f} (difference from target: {difference:.2f})")
+    # Print -10 through 10 instead of the full -100 through 100 search range:
+    # 201 visible guesses explain the process without flooding the terminal with
+    # roughly 2,000 lines of output.
+    x_value, difference = solve_for_x(expression, target, -10, 10, show_steps=True)
+    print(f"Closest x: {x_value:.1f} (difference: {difference:.2f})")
 
 
 def explain_search_algorithm():
-    """Print a brief explanation of brute-force and a smarter search."""
+    """Explain brute-force search and name a smarter alternative."""
     print(
         "Brute-force search tries every candidate and keeps the closest one. "
-        "It is slow because it does not use clues to skip candidates. "
-        "Binary search is smarter when the search space is ordered: it repeatedly "
-        "cuts the remaining range in half."
+        "It is slow because it does not skip guesses. Binary search is smarter "
+        "for an ordered range because it repeatedly cuts that range in half."
     )
 
 
 def main():
-    """Run the calculator menu until the user chooses to exit."""
+    """Show the menu repeatedly until the user chooses to exit."""
     while True:
         print("\nSmart Calculator")
-        print("1. Basic calculation")
-        print("2. Equation solver")
-        print("3. Search visualisation")
-        print("4. What is a search algorithm?")
-        print("5. Exit")
+        print("1. Basic calculation\n2. Equation solver\n3. Search visualisation")
+        print("4. What is a search algorithm?\n5. Exit")
         choice = input("Choose an option: ").strip()
 
+        # Run the selected feature; the final branch handles invalid choices.
         if choice == "1":
             try:
-                first_number = float(input("First number: "))
+                first = float(input("First number: "))
                 operation = input("Operation (+, -, *, /): ").strip()
-                second_number = float(input("Second number: "))
-                result = basic_calculate(first_number, second_number, operation)
-                print(f"Result: {result}")
+                second = float(input("Second number: "))
+                print("Result:", basic_calculate(first, second, operation))
             except (ValueError, ZeroDivisionError) as error:
-                print(f"Could not calculate: {error}")
+                print("Could not calculate:", error)
         elif choice == "2":
             try:
                 equation_solver_menu()
             except (SyntaxError, ValueError, ZeroDivisionError) as error:
-                print(f"Could not solve that expression: {error}")
+                print("Could not solve that expression:", error)
         elif choice == "3":
             visualize_search()
         elif choice == "4":
@@ -148,5 +135,6 @@ def main():
             print("Invalid choice. Enter a number from 1 to 5.")
 
 
+# Start the menu only when this file is run directly, not when imported.
 if __name__ == "__main__":
     main()
